@@ -27,8 +27,14 @@ static const char *mutevol[] = { "/usr/bin/pactl", "set-sink-mute", "@DEFAULT_SI
 static const char *nextsong[]     = { "/usr/bin/playerctl", "--player=mpv,spotify", "next", NULL};
 static const char *presong[] = { "/usr/bin/playerctl","--player=mpv,spotify", "previous", NULL};
 static const char *playpause[]    = { "/usr/bin/playerctl", "--player=mpv,spotify", "play-pause", NULL};
+
 /* Screenshoting using Gyazo */
 static const char *screenshot[] = { "/usr/bin/gyazo"};
+
+/* Brightness */
+static const char *brupcmd[] = { "brightnessctl", "set", "10%+", NULL };
+static const char *brdowncmd[] = { "brightnessctl", "set", "10%-", NULL };
+
 
 /* tagging */
 static const char *tags[] = { "1", "2", "3", "4", "5", "6", "7", "8", "9" };
@@ -107,6 +113,9 @@ static Key keys[] = {
 	{ MODKEY,		        XF86XK_AudioLowerVolume, spawn, {.v = presong} },
 	/*				Screenshot Gyazo Support 		*/
 	{ MODKEY,			XK_g,	   spawn,	   {.v = screenshot } },
+	/*                              Brightness              */
+        { 0, XF86XK_MonBrightnessUp,  spawn,          {.v = brupcmd} },
+        { 0, XF86XK_MonBrightnessDown, spawn,          {.v = brdowncmd} },
 	TAGKEYS(                        XK_1,                      0)
 	TAGKEYS(                        XK_2,                      1)
 	TAGKEYS(                        XK_3,                      2)
