@@ -2,8 +2,10 @@
 /* Included for audio control*/
 #include <X11/XF86keysym.h>
 /* appearance */
-static const unsigned int borderpx  = 1;        /* border pixel of windows */
+static const unsigned int borderpx  = 3;        /* border pixel of windows */
 static const unsigned int snap      = 32;       /* snap pixel */
+static const int startwithgaps	     = 0;	 /* 1 means gaps are used by default */
+static const unsigned int gappx     = 10;       /* default gap between windows in pixels */
 static const unsigned int systraypinning = 0;   /* 0: sloppy systray follows selected monitor, >0: pin systray to monitor X */
 static const unsigned int systrayonleft = 0;    /* 0: systray in the right corner, >0: systray on left of status text */
 static const unsigned int systrayspacing = 2;   /* systray spacing */
@@ -14,10 +16,10 @@ static const int topbar             = 1;        /* 0 means bottom bar */
 static const char *fonts[]          = { "monospace:size=10", "twemoji:pixelsize=14:antialias=true:autohint=true","JoyPixels:pixelsize=14:antialias=true:autohint=true" "ttf-weather-icons:pixelsize=14:antialias=true:autohint=true" };
 static const char dmenufont[]       = "monospace:size=10";
 static const char col_gray1[]       = "#222222";
-static const char col_gray2[]       = "#444444";
+static const char col_gray2[]       = "#878787";
 static const char col_gray3[]       = "#bbbbbb";
 static const char col_gray4[]       = "#eeeeee";
-static const char col_cyan[]        = "#005577";
+static const char col_cyan[]        = "#812db5";
 static const char *colors[][3]      = {
 	/*               fg         bg         border   */
 	[SchemeNorm] = { col_gray3, col_gray1, col_gray2 },
@@ -30,9 +32,9 @@ static const char *downvol[] = { "/usr/bin/pactl", "set-sink-volume", "@DEFAULT_
 static const char *mutevol[] = { "/usr/bin/pactl", "set-sink-mute", "@DEFAULT_SINK@", "toggle", NULL };
 
 /* Spotify and mpv changing music */
-static const char *nextsong[]     = { "/usr/bin/playerctl", "--player=mpv,spotify", "next", NULL};
-static const char *presong[] = { "/usr/bin/playerctl","--player=mpv,spotify", "previous", NULL};
-static const char *playpause[]    = { "/usr/bin/playerctl", "--player=mpv,spotify", "play-pause", NULL};
+static const char *nextsong[]     = { "/usr/bin/playerctl", "--player=mpv,spotify,cider,youtube-music", "next", NULL};
+static const char *presong[] = { "/usr/bin/playerctl","--player=mpv,spotify,cider,youtube-music", "previous", NULL};
+static const char *playpause[]    = { "/usr/bin/playerctl", "--player=mpv,spotify,cider,youtube-music", "play-pause", NULL};
 
 /* Screenshoting using Gyazo */
 static const char *screenshot[] = { "/usr/bin/gyazo"};
@@ -52,6 +54,7 @@ static const Rule rules[] = {
 	/* class      instance    title       tags mask     isfloating   monitor */
 	{ "Gimp",     NULL,       NULL,       0,            1,           -1 },
 	{ "Firefox",  NULL,       NULL,       1 << 8,       0,           -1 },
+	{ "Steam",    NULL, 	  NULL, 	  4,            1,            0 },
 };
 
 /* layout(s) */
@@ -111,6 +114,12 @@ static const Key keys[] = {
 	{ MODKEY,                       XK_period, focusmon,       {.i = +1 } },
 	{ MODKEY|ShiftMask,             XK_comma,  tagmon,         {.i = -1 } },
 	{ MODKEY|ShiftMask,             XK_period, tagmon,         {.i = +1 } },
+	/*Gaps*/
+	{ MODKEY,                       XK_minus,  setgaps,        {.i = -5 } },
+	{ MODKEY,                       XK_equal,  setgaps,        {.i = +5 } },
+	{ MODKEY|ShiftMask,             XK_minus,  setgaps,        {.i = GAP_RESET } },
+	{ MODKEY|ShiftMask,             XK_equal,  setgaps,        {.i = GAP_TOGGLE} },
+	/*Tags*/
 	TAGKEYS(                        XK_1,                      0)
 	TAGKEYS(                        XK_2,                      1)
 	TAGKEYS(                        XK_3,                      2)

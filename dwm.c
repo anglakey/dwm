@@ -70,6 +70,9 @@
 #define VERSION_MINOR               0
 #define XEMBED_EMBEDDED_VERSION (VERSION_MAJOR << 16) | VERSION_MINOR
 
+#define GAP_TOGGLE 100
+#define GAP_RESET  0
+
 /* enums */
 enum { CurNormal, CurResize, CurMove, CurLast }; /* cursor */
 enum { SchemeNorm, SchemeSel }; /* color schemes */
@@ -108,6 +111,7 @@ struct Client {
 	int bw, oldbw;
 	unsigned int tags;
 	int isfixed, isfloating, isurgent, neverfocus, oldstate, isfullscreen;
+	int issteam;
 	Client *next;
 	Client *snext;
 	Monitor *mon;
@@ -134,6 +138,8 @@ struct Monitor {
 	int by;               /* bar geometry */
 	int mx, my, mw, mh;   /* screen size */
 	int wx, wy, ww, wh;   /* window area  */
+	int gappx;	      /* gaps between windows */
+	int drawwithgaps;     /* toggle gaps */
 	unsigned int seltags;
 	unsigned int sellt;
 	unsigned int tagset[2];
@@ -225,6 +231,7 @@ static void sendmon(Client *c, Monitor *m);
 static void setclientstate(Client *c, long state);
 static void setfocus(Client *c);
 static void setfullscreen(Client *c, int fullscreen);
+static void setgaps(const Arg *arg);
 static void setlayout(const Arg *arg);
 static void setmfact(const Arg *arg);
 static void setup(void);
@@ -323,6 +330,9 @@ applyrules(Client *c)
 	XGetClassHint(dpy, c->win, &ch);
 	class    = ch.res_class ? ch.res_class : broken;
 	instance = ch.res_name  ? ch.res_name  : broken;
+
+	if (strstr(class, "Steam") || strstr(class, "steam_app_"))
+		c->issteam = 1;
 
 	for (i = 0; i < LENGTH(rules); i++) {
 		r = &rules[i];
@@ -680,13 +690,15 @@ configurerequest(XEvent *e)
 			c->bw = ev->border_width;
 		else if (c->isfloating || !selmon->lt[selmon->sellt]->arrange) {
 			m = c->mon;
-			if (ev->value_mask & CWX) {
-				c->oldx = c->x;
-				c->x = m->mx + ev->x;
-			}
-			if (ev->value_mask & CWY) {
-				c->oldy = c->y;
-				c->y = m->my + ev->y;
+			if (!c->issteam) {
+				if (ev->value_mask & CWX) {
+					c->oldx = c->x;
+					c->x = m->mx + ev->x;
+				}
+				if (ev->value_mask & CWY) {
+					c->oldy = c->y;
+					c->y = m->my + ev->y;
+				}
 			}
 			if (ev->value_mask & CWWidth) {
 				c->oldw = c->w;
@@ -730,6 +742,8 @@ createmon(void)
 	m->nmaster = nmaster;
 	m->showbar = showbar;
 	m->topbar = topbar;
+	m->gappx = gappx;
+	m->drawwithgaps = startwithgaps;
 	m->lt[0] = &layouts[0];
 	m->lt[1] = &layouts[1 % LENGTH(layouts)];
 	strncpy(m->ltsymbol, layouts[0].symbol, sizeof m->ltsymbol);
@@ -903,6 +917,12 @@ focus(Client *c)
 		attachstack(c);
 		grabbuttons(c, 1);
 		XSetWindowBorder(dpy, c->win, scheme[SchemeSel][ColBorder].pixel);
+                if (!selmon->drawwithgaps && !c->isfloating) {
+			XWindowChanges wc;
+                        wc.sibling = selmon->barwin;
+                        wc.stack_mode = Below;
+                        XConfigureWindow(dpy, c->win, CWSibling | CWStackMode, &wc);
+                }
 		setfocus(c);
 	} else {
 		XSetInputFocus(dpy, root, RevertToPointerRoot, CurrentTime);
@@ -1188,6 +1208,8 @@ manage(Window w, XWindowAttributes *wa)
 	updatewindowtype(c);
 	updatesizehints(c);
 	updatewmhints(c);
+	c->x = c->mon->mx + (c->mon->mw - WIDTH(c)) / 2;
+	c->y = c->mon->my + (c->mon->mh - HEIGHT(c)) / 2;
 	XSelectInput(dpy, w, EnterWindowMask|FocusChangeMask|PropertyChangeMask|StructureNotifyMask);
 	grabbuttons(c, 0);
 	if (!c->isfloating)
@@ -1249,7 +1271,10 @@ monocle(Monitor *m)
 	if (n > 0) /* override layout symbol */
 		snprintf(m->ltsymbol, sizeof m->ltsymbol, "[%d]", n);
 	for (c = nexttiled(m->clients); c; c = nexttiled(c->next))
-		resize(c, m->wx, m->wy, m->ww - 2 * c->bw, m->wh - 2 * c->bw, 0);
+		if (selmon->drawwithgaps)
+			resize(c, m->wx, m->wy, m->ww - 2 * c->bw, m->wh - 2 * c->bw, 0);
+		else
+			resize(c, m->wx - c->bw, m->wy, m->ww, m->wh, False);
 }
 
 void
@@ -1451,6 +1476,15 @@ resizeclient(Client *c, int x, int y, int w, int h)
 	c->oldw = c->w; c->w = wc.width = w;
 	c->oldh = c->h; c->h = wc.height = h;
 	wc.border_width = c->bw;
+	if (!selmon->drawwithgaps && /* this is the noborderfloatingfix patch, slightly modified so that it will work if, and only if, gaps are disabled. */
+	    (((nexttiled(c->mon->clients) == c && !nexttiled(c->next)) /* these two first lines are the only ones changed. if you are manually patching and have noborder installed already, just change these lines; or conversely, just remove this section if the noborder patch is not desired ;) */
+	    || &monocle == c->mon->lt[c->mon->sellt]->arrange))
+	    && !c->isfullscreen && !c->isfloating
+	    && NULL != c->mon->lt[c->mon->sellt]->arrange) {
+	        c->w = wc.width += c->bw * 2;
+	        c->h = wc.height += c->bw * 2;
+	        wc.border_width = 0;
+	}
 	XConfigureWindow(dpy, c->win, CWX|CWY|CWWidth|CWHeight|CWBorderWidth, &wc);
 	configure(c);
 	XSync(dpy, False);
@@ -1691,6 +1725,26 @@ setfullscreen(Client *c, int fullscreen)
 }
 
 void
+setgaps(const Arg *arg)
+{
+	switch(arg->i)
+	{
+		case GAP_TOGGLE:
+			selmon->drawwithgaps = !selmon->drawwithgaps;
+			break;
+		case GAP_RESET:
+			selmon->gappx = gappx;
+			break;
+		default:
+			if (selmon->gappx + arg->i < 0)
+				selmon->gappx = 0;
+			else
+				selmon->gappx += arg->i;
+	}
+	arrange(selmon);
+}
+
+void
 setlayout(const Arg *arg)
 {
 	if (!arg || !arg->v || arg->v != selmon->lt[selmon->sellt])
@@ -1877,23 +1931,42 @@ tile(Monitor *m)
 	for (n = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), n++);
 	if (n == 0)
 		return;
-
-	if (n > m->nmaster)
-		mw = m->nmaster ? m->ww * m->mfact : 0;
-	else
-		mw = m->ww;
-	for (i = my = ty = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), i++)
-		if (i < m->nmaster) {
-			h = (m->wh - my) / (MIN(n, m->nmaster) - i);
-			resize(c, m->wx, m->wy + my, mw - (2*c->bw), h - (2*c->bw), 0);
-			if (my + HEIGHT(c) < m->wh)
-				my += HEIGHT(c);
-		} else {
-			h = (m->wh - ty) / (n - i);
-			resize(c, m->wx + mw, m->wy + ty, m->ww - mw - (2*c->bw), h - (2*c->bw), 0);
-			if (ty + HEIGHT(c) < m->wh)
-				ty += HEIGHT(c);
-		}
+        if (m->drawwithgaps) { /* draw with fullgaps logic */
+                if (n > m->nmaster)
+                        mw = m->nmaster ? m->ww * m->mfact : 0;
+                else
+                        mw = m->ww - m->gappx;
+                for (i = 0, my = ty = m->gappx, c = nexttiled(m->clients); c; c = nexttiled(c->next), i++)
+                        if (i < m->nmaster) {
+                                h = (m->wh - my) / (MIN(n, m->nmaster) - i) - m->gappx;
+                                resize(c, m->wx + m->gappx, m->wy + my, mw - (2*c->bw) - m->gappx, h - (2*c->bw), 0);
+                                if (my + HEIGHT(c) + m->gappx < m->wh)
+                                        my += HEIGHT(c) + m->gappx;
+                        } else {
+                                h = (m->wh - ty) / (n - i) - m->gappx;
+                                resize(c, m->wx + mw + m->gappx, m->wy + ty, m->ww - mw - (2*c->bw) - 2*m->gappx, h - (2*c->bw), 0);
+                                if (ty + HEIGHT(c) + m->gappx < m->wh)
+                                        ty += HEIGHT(c) + m->gappx;
+                        }
+        } else { /* draw with singularborders logic */
+                if (n > m->nmaster)
+                        mw = m->nmaster ? m->ww * m->mfact : 0;
+                else
+                        mw = m->ww;
+                for (i = my = ty = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), i++)
+                        if (i < m->nmaster) {
+                                h = (m->wh - my) / (MIN(n, m->nmaster) - i);
+                                if (n == 1)
+                                        resize(c, m->wx - c->bw, m->wy, m->ww, m->wh, False);
+                                else
+                                        resize(c, m->wx - c->bw, m->wy + my, mw - c->bw, h - c->bw, False);
+                                my += HEIGHT(c) - c->bw;
+                        } else {
+                                h = (m->wh - ty) / (n - i);
+                                resize(c, m->wx + mw - c->bw, m->wy + ty, m->ww - mw, h - c->bw, False);
+                                ty += HEIGHT(c) - c->bw;
+                        }
+        }
 }
 
 void
