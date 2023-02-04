@@ -4,8 +4,8 @@
 /* appearance */
 static const unsigned int borderpx  = 3;        /* border pixel of windows */
 static const unsigned int snap      = 32;       /* snap pixel */
-static const int startwithgaps	     = 0;	 /* 1 means gaps are used by default */
-static const unsigned int gappx     = 10;       /* default gap between windows in pixels */
+static const int startwithgaps	     = 1;	 /* 1 means gaps are used by default */
+static const unsigned int gappx     = 5;       /* default gap between windows in pixels */
 static const unsigned int systraypinning = 0;   /* 0: sloppy systray follows selected monitor, >0: pin systray to monitor X */
 static const unsigned int systrayonleft = 0;    /* 0: systray in the right corner, >0: systray on left of status text */
 static const unsigned int systrayspacing = 2;   /* systray spacing */
@@ -26,25 +26,9 @@ static const char *colors[][3]      = {
 	[SchemeSel]  = { col_gray4, col_cyan,  col_cyan  },
 };
 
-/* Audio */
-static const char *upvol[]   = { "/usr/bin/pactl", "set-sink-volume", "@DEFAULT_SINK@", "+5%",     NULL };
-static const char *downvol[] = { "/usr/bin/pactl", "set-sink-volume", "@DEFAULT_SINK@", "-5%",     NULL };
-static const char *mutevol[] = { "/usr/bin/pactl", "set-sink-mute", "@DEFAULT_SINK@", "toggle", NULL };
-
-/* Spotify and mpv changing music */
-static const char *nextsong[]     = { "/usr/bin/playerctl", "--player=mpv,spotify,cider,youtube-music", "next", NULL};
-static const char *presong[] = { "/usr/bin/playerctl","--player=mpv,spotify,cider,youtube-music", "previous", NULL};
-static const char *playpause[]    = { "/usr/bin/playerctl", "--player=mpv,spotify,cider,youtube-music", "play-pause", NULL};
-
-/* Screenshoting using Gyazo */
-static const char *screenshot[] = { "/usr/bin/gyazo"};
-
-/* Brightness */
-static const char *brupcmd[] = { "brightnessctl", "set", "10%+", NULL };
-static const char *brdowncmd[] = { "brightnessctl", "set", "10%-", NULL };
 
 /* tagging */
-static const char *tags[] = { "1", "2", "3", "4", "5", "6", "7", "8", "9" };
+static const char *tags[] = { "1", "2", "3", "4", "🎵", "6", "7", "8", "9" };
 
 static const Rule rules[] = {
 	/* xprop(1):
@@ -54,7 +38,12 @@ static const Rule rules[] = {
 	/* class      instance    title       tags mask     isfloating   monitor */
 	{ "Gimp",     NULL,       NULL,       0,            1,           -1 },
 	{ "Firefox",  NULL,       NULL,       1 << 8,       0,           -1 },
-	{ "Steam",    NULL, 	  NULL, 	  4,            1,            0 },
+	{ "Steam",   NULL,        NULL,     4,            1,            0 },
+	{ "Steam",    NULL,    "Steam",	      4,            0,            0 },
+	{ "YouTube Music", "youtube music", NULL,        1<<4,            0, 			  -1},
+	{ "net-runelite-launcher-Launcher", "net-runelite-launcher-Launcher", NULL, 0, 1, -1},
+	{ "net-runelite-client-RuneLite", "net-runelite-client-RuneLite", "RuneLite", 0, 0, -1},
+	{ "net-runelite-client-RuneLite", "net-runelite-client-RuneLite", "RuneLite Launcher", 0, 1, -1},
 };
 
 /* layout(s) */
@@ -85,12 +74,30 @@ static const Layout layouts[] = {
 static char dmenumon[2] = "0"; /* component of dmenucmd, manipulated in spawn() */
 static const char *dmenucmd[] = { "dmenu_run", "-m", dmenumon, "-fn", dmenufont, "-nb", col_gray1, "-nf", col_gray3, "-sb", col_cyan, "-sf", col_gray4, NULL };
 static const char *termcmd[]  = { "st", NULL };
+static const char *alaccmd[]  = { "alacritty", NULL };
 static const char *roficmd[] = { "rofi", "-show", "drun", "-show-icons", NULL };
+/* Audio */
+static const char *upvol[]   = { "/usr/bin/pactl", "set-sink-volume", "@DEFAULT_SINK@", "+5%",     NULL };
+static const char *downvol[] = { "/usr/bin/pactl", "set-sink-volume", "@DEFAULT_SINK@", "-5%",     NULL };
+static const char *mutevol[] = { "/usr/bin/pactl", "set-sink-mute", "@DEFAULT_SINK@", "toggle", NULL };
+/* Spotify and mpv changing music */
+static const char *nextsong[]     = { "/usr/bin/playerctl", "--player=mpv,spotify,cider,youtube-music", "next", NULL};
+static const char *presong[] = { "/usr/bin/playerctl","--player=mpv,spotify,cider,youtube-music", "previous", NULL};
+static const char *playpause[]    = { "/usr/bin/playerctl", "--player=mpv,spotify,cider,youtube-music", "play-pause", NULL};
+/* Screenshoting using Gyazo */
+static const char *screenshot[] = { "/usr/bin/gyazo"};
+/* Brightness */
+static const char *brupcmd[] = { "brightnessctl", "set", "10%+", NULL };
+static const char *brdowncmd[] = { "brightnessctl", "set", "10%-", NULL };
+/* Lock Screen*/
+static const char *lockscreen[] = { "betterlockscreen", "-l", NULL };
 
 static const Key keys[] = {
 	/* modifier                     key        function        argument */
-	{ MODKEY,                       XK_p,      spawn,          {.v = dmenucmd } },
-	{ MODKEY|ShiftMask,             XK_Return, spawn,          {.v = termcmd } },
+/*	{ MODKEY,                       XK_p,      spawn,          {.v = dmenucmd } }, */
+	{ MODKEY,			XK_p,	   spawn, 	   {.v = roficmd  } },
+/*	{ MODKEY|ShiftMask,             XK_Return, spawn,          {.v = termcmd } }, */
+	{ MODKEY|ShiftMask,		XK_Return, spawn,	   {.v = alaccmd } },
 	{ MODKEY,                       XK_b,      togglebar,      {0} },
 	{ MODKEY,                       XK_j,      focusstack,     {.i = +1 } },
 	{ MODKEY,                       XK_k,      focusstack,     {.i = -1 } },
@@ -138,10 +145,12 @@ static const Key keys[] = {
 	{ MODKEY,		        		XF86XK_AudioRaiseVolume, spawn, {.v = nextsong } },
 	{ MODKEY,		        		XF86XK_AudioLowerVolume, spawn, {.v = presong} },
 	/*				Screenshot Gyazo Support 		*/
-	{ MODKEY,						XK_g,	   spawn,	   {.v = screenshot } },
+	{ MODKEY,						XK_g,	   spawn,	       {.v = screenshot } },
 	/*                              Brightness              */
     { 0, 							XF86XK_MonBrightnessUp,  spawn,          {.v = brupcmd} },
     { 0, 							XF86XK_MonBrightnessDown, spawn,          {.v = brdowncmd} },
+	/*				Lockscreen		*/
+	{ MODKEY|ShiftMask,		XK_l,	spawn,		 			  {.v = lockscreen} },
 };
 
 /* button definitions */
